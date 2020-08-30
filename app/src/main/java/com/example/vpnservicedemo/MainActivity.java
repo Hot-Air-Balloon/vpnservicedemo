@@ -1,11 +1,11 @@
-package com.example.vpnservicedemp;
+package com.example.vpnservicedemo;
 
 import android.os.Bundle;
 import android.content.Intent;
 import android.net.VpnService;
 
+import com.example.vpnservicedemp.R;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
-import com.google.android.material.snackbar.Snackbar;
 
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.Toolbar;

@@ -4,4 +4,4 @@
 启动了VpnService，需要在AndroidManifest.xml文件里声明服务所在的类。
 目前对android里对Service和Intent还比较陌生。
 
-计划下一步继续完善MyVpnService类。
+计划下一步继续完善MyVpnService类。要学习还很多，每天坚持。

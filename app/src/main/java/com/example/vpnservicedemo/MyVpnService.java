@@ -1,4 +1,4 @@
-package com.example.vpnservicedemp;
+package com.example.vpnservicedemo;
 
 import android.app.Service;
 import android.content.Intent;
