@@ -65,20 +65,33 @@ public class MyVpnService extends VpnService implements Runnable {
             // byte[] m_IpPacket = new byte[20000];
             ByteBuffer packet = ByteBuffer.allocate(MAX_PACKET_SIZE);
             int size = 0;
+            ByteBuffer buffer = ByteBuffer.allocate(MAX_PACKET_SIZE);
+//            tunnel.write(buffer);
+//            tunnel.close();
             while (size != -1) {
                 while ((size = in.read(packet.array())) > 0) {
+//                    packet.limit(size);
+//                    int writeSize = tunnel.write(packet);
+//                    Log.i("write size", Integer.toString(writeSize));
+//                    packet.clear();
+//                    size = tunnel.read(buffer);
+//                    Log.i("size", size + "");
+//                    break;
                     Log.i("read length", Integer.toString(size));
-                    tunnel.write(packet);
+                    packet.limit(size);
+                    int writeSize = tunnel.write(packet);
+                    Log.i("write size", Integer.toString(writeSize));
                     packet.clear();
-
-                    size = tunnel.read(packet);
-
+                    Thread.sleep(100);
+                    size = tunnel.read(buffer);
+                    Log.i("size", size + "");
                     if (size > 0) {
-                        out.write(packet.array(), 0, size);
-                        packet.clear();
+                        String s = new String(buffer.array(), 0, size, "utf-8");
+                        Log.i("read s", s);
+                        out.write(buffer.array(), 0, size);
+                        buffer.clear();
                     }
                 }
-                Thread.sleep(100);
             }
             out.close();
             in.close();
@@ -90,8 +103,8 @@ public class MyVpnService extends VpnService implements Runnable {
         Builder builder = new Builder();
         ParcelFileDescriptor pfdDescriptor = builder
                 .setSession(("MyVPNService"))
-                .addAddress("192.168.0.1", 24)
-                .addDnsServer("8.8.8.8")
+                .addAddress("10.0.0.2", 24)
+                .addDnsServer("223.5.5.5")
                 .addRoute("0.0.0.0", 0)
                 .establish();
         return pfdDescriptor;
