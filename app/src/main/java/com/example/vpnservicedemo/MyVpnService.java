@@ -18,6 +18,34 @@ public class MyVpnService extends VpnService implements Runnable {
     private ParcelFileDescriptor m_VPNInterface;
     private final SocketAddress serverAddress = new InetSocketAddress("172.16.167.128", 9090);
     private static final int MAX_PACKET_SIZE = Short.MAX_VALUE;
+
+    private class ReadTunnel implements Runnable {
+        private DatagramChannel readTunnel;
+        private FileOutputStream writeOut;
+        ReadTunnel (DatagramChannel tunnel, FileOutputStream out) {
+            this.readTunnel = tunnel;
+            this.writeOut = out;
+        }
+        @Override
+        public void run() {
+            try {
+                ByteBuffer buffer = ByteBuffer.allocate(MAX_PACKET_SIZE);
+                int length = 0;
+                while (length != -1) {
+                    length = readTunnel.read(buffer);
+                    Log.i("recive", length + "");
+                    if (length > 0) {
+                        writeOut.write(buffer.array(), 0, length);
+                        buffer.clear();
+                    } else {
+                        Thread.sleep(100);
+                    }
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+    }
     @Override
     public  void onCreate () {
         Log.i("MyVpnService", "create");
@@ -68,6 +96,9 @@ public class MyVpnService extends VpnService implements Runnable {
             ByteBuffer buffer = ByteBuffer.allocate(MAX_PACKET_SIZE);
 //            tunnel.write(buffer);
 //            tunnel.close();
+            ReadTunnel m_ReadTunnel = new ReadTunnel(tunnel, out);
+            Thread m_ReadTunnelThread = new Thread(m_ReadTunnel, "ReadTunnelThread");
+            m_ReadTunnelThread.start();
             while (size != -1) {
                 while ((size = in.read(packet.array())) > 0) {
 //                    packet.limit(size);
@@ -82,15 +113,15 @@ public class MyVpnService extends VpnService implements Runnable {
                     int writeSize = tunnel.write(packet);
                     Log.i("write size", Integer.toString(writeSize));
                     packet.clear();
-                    Thread.sleep(100);
-                    size = tunnel.read(buffer);
-                    Log.i("size", size + "");
-                    if (size > 0) {
-                        String s = new String(buffer.array(), 0, size, "utf-8");
-                        Log.i("read s", s);
-                        out.write(buffer.array(), 0, size);
-                        buffer.clear();
-                    }
+//                    Thread.sleep(100);
+//                    size = tunnel.read(buffer);
+//                    Log.i("size", size + "");
+//                    if (size > 0) {
+//                        String s = new String(buffer.array(), 0, size, "utf-8");
+//                        Log.i("read s", s);
+//                        out.write(buffer.array(), 0, size);
+//                        buffer.clear();
+//                    }
                 }
             }
             out.close();
