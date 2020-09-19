@@ -54,7 +54,7 @@ public class MainActivity extends AppCompatActivity {
 
     private Intent getServiceIntent() {
         Log.i("MyVpnService", "getServiceIntent");
-        return new Intent(this, MyVpnService.class);
+        return new Intent(this, LocalVpnService.class);
     }
 
     @Override
