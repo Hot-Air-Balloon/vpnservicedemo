@@ -7,6 +7,11 @@ import android.os.IBinder;
 import android.os.ParcelFileDescriptor;
 import android.util.Log;
 
+import com.example.tcpip.CommonMethods;
+import com.example.tcpip.IPHeader;
+import com.example.tcpip.TCPHeader;
+import com.example.tcpip.UDPHeader;
+
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.net.InetSocketAddress;
@@ -22,6 +27,9 @@ public class MyVpnService extends VpnService implements Runnable {
     private class ReadTunnel implements Runnable {
         private DatagramChannel readTunnel;
         private FileOutputStream writeOut;
+        private IPHeader m_IPHeader;
+        private TCPHeader m_TCPHeader;
+        private UDPHeader m_UDPHeader;
         ReadTunnel (DatagramChannel tunnel, FileOutputStream out) {
             this.readTunnel = tunnel;
             this.writeOut = out;
@@ -35,6 +43,9 @@ public class MyVpnService extends VpnService implements Runnable {
                     length = readTunnel.read(buffer);
                     Log.i("recive", length + "");
                     if (length > 0) {
+                        m_IPHeader = new IPHeader(buffer.array(), 0);
+                        m_TCPHeader = new TCPHeader(buffer.array(), 20);
+                        Log.i("crc", CommonMethods.ComputeTCPChecksum(m_IPHeader, m_TCPHeader) ? "true" : "false");
                         writeOut.write(buffer.array(), 0, length);
                         buffer.clear();
                     } else {

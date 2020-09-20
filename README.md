@@ -76,3 +76,8 @@ JAVA里没有无符号类型，所以端口号一旦大了，就会输出负数�
 ## 第七节
 
 java TCP/IP里。有一个selector,可以在一个线程里管理多个socketChannel,核心操作就是把selector绑定到多个socket上。
+把IP报文修改以后，再写回tun设备失败了，因为接收报文的socket并没有收到请求。
+目前调试这个问题2个方向：
+1、可能是IP报文的CRC不对。
+2、可能tun设备设置的不对。
+可以通过上一次直接转发给iptables的报文来调试是否是CRC不对。

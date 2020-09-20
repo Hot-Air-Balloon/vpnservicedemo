@@ -174,6 +174,7 @@ public class LocalVpnService extends VpnService implements Runnable {
                         tcpHeader.setDestinationPort((short)(m_localTcpServer.Port & 0xFFFF));
 
                         CommonMethods.ComputeTCPChecksum(ipHeader, tcpHeader);
+                        Log.i("crc", CommonMethods.ComputeTCPChecksum(m_IPHeader, m_TCPHeader) ? "true" : "false");
                         // System.out.printf("%s:%d\n", CommonMethods.ipIntToString(ipHeader.getDestinationIP()), tcpHeader.getDestinationPort() & 0xFFFF);
                         m_out.write(ipHeader.m_Data, ipHeader.m_Offset, size);
 //                        System.out.printf("%s\n", new String(ipHeader.m_Data));
