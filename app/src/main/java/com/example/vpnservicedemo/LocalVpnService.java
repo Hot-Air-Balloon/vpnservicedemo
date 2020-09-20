@@ -18,6 +18,7 @@ import java.net.Inet4Address;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.NetworkInterface;
+import java.net.Socket;
 import java.net.SocketAddress;
 import java.net.SocketException;
 import java.nio.ByteBuffer;
@@ -25,6 +26,7 @@ import java.nio.channels.DatagramChannel;
 import java.util.Enumeration;
 
 public class LocalVpnService extends VpnService implements Runnable {
+    public static LocalVpnService Instance;
     private ParcelFileDescriptor m_VPNInterface;
     //    private final SocketAddress serverAddress = new InetSocketAddress("172.16.167.128", 9090);
     private static final int MAX_PACKET_SIZE = Short.MAX_VALUE;
@@ -33,6 +35,8 @@ public class LocalVpnService extends VpnService implements Runnable {
     private TCPHeader m_TCPHeader;
     private UDPHeader m_UDPHeader;
     private static int LOCAL_IP;
+    private FileOutputStream m_out;
+    LocalTcpServer m_localTcpServer;
 
     private class ReadTunnel implements Runnable {
         private DatagramChannel readTunnel;
@@ -87,12 +91,16 @@ public class LocalVpnService extends VpnService implements Runnable {
     }
 
     @Override
-    public void run() {
+    public synchronized void run() {
         Log.i("LocalVpnService", "run");
         try {
+            Instance = this;
+            m_localTcpServer = new LocalTcpServer((short)0);
+            m_localTcpServer.start();
+
             this.m_VPNInterface = this.entablishVPN();
             // 获得网卡的输入输出流
-            FileOutputStream out = new FileOutputStream(this.m_VPNInterface.getFileDescriptor());
+            m_out = new FileOutputStream(this.m_VPNInterface.getFileDescriptor());
             FileInputStream in = new FileInputStream(this.m_VPNInterface.getFileDescriptor());
             m_Packet = new byte[20000];
             m_IPHeader = new IPHeader(m_Packet, 0);
@@ -105,7 +113,7 @@ public class LocalVpnService extends VpnService implements Runnable {
                 }
                 Thread.sleep(100);
             }
-            out.close();
+            m_out.close();
             in.close();
         } catch (Exception e) {
             e.printStackTrace();
@@ -117,16 +125,71 @@ public class LocalVpnService extends VpnService implements Runnable {
                 TCPHeader tcpHeader = m_TCPHeader;
                 tcpHeader.m_Offset = ipHeader.getHeaderLength();
                 int sourceIP = ipHeader.getSourceIP();
-                if (sourceIP == LOCAL_IP) {
-                    Log.i("LocalVpnService", CommonMethods.ipIntToString(sourceIP));
-                    Log.i("LocalVpnService", Short.toString(tcpHeader.getSourcePort()));
-                    Log.i("LocalVpnService", CommonMethods.ipIntToString(ipHeader.getDestinationIP()));
-                    Log.i("LocalVpnService", Short.toString(tcpHeader.getDestinationPort()));
+                short sourcePort = tcpHeader.getSourcePort();
+                int destinationIP = ipHeader.getDestinationIP();
+                short destinationPort = tcpHeader.getDestinationPort();
+                // 如果是从tun过来的报文，就修改报文发给本地socket端口
+                if (destinationPort == m_localTcpServer.Port) {
+                    System.out.printf("send loop");
                 }
-                Log.i("LocalVpnService", CommonMethods.ipIntToString(sourceIP));
+                if (sourceIP == LOCAL_IP) {
+                    System.out.printf("%s:%d to %s:%d\n",
+                            CommonMethods.ipIntToString(sourceIP),
+                            sourcePort & 0xFFFF,
+                            CommonMethods.ipIntToString(destinationIP),
+                            destinationPort & 0xFFFF
+                    );
+//                     Log.i("LocalVpnService", CommonMethods.ipIntToString(sourceIP));
+//                     Log.i("LocalVpnService", Short.toString(sourcePort));
+//                     Log.i("LocalVpnService", CommonMethods.ipIntToString(destinationIP));
+//                     Log.i("LocalVpnService", Short.toString(destinationPort));
+                    if (sourcePort != m_localTcpServer.Port) {
+                        // 如果不是从本地scoket服务来的报文，就把报文发给本地socket服务
+                        // 如果会话是不存在，就创建会话
+                        NatSession session = NatSessionManager.getSession(sourcePort);
+                        if (session == null ||
+                            session.RemoteIP != destinationIP ||
+                            session.RemotePort != destinationPort) {
+                            session = NatSessionManager.createSession(sourcePort, destinationIP, destinationPort);
+                        }
+                        session.PacketSent++;
+                        // 一个小优化，不知道是否正确
+                        int tcpDataSize = ipHeader.getDataLength() - tcpHeader.getHeaderLength();
+                        // if (session.PacketSent == 2 && tcpDataSize == 0) {
+                            // return; // 丢弃tcp握手的第二个ACK报文。因为客户端发数据的时候也会带上ACK，这样可以在服务器Accept之前分析出HOST信息。
+                        // }
+
+                        // 分析数据，找到Host
+                        // if (session.BytesSent == 0 && tcpDataSize > 10) {
+                        //    int dataOffset = tcpHeader.m_Offset + tcpHeader.getHeaderLength();
+                        //    String host = HttpHostHeaderParser.parseHost(tcpHeader.m_Data, dataOffset, tcpDataSize);
+                        //    if (host != null) {
+                        //        session.RemoteHost = host;
+                        //    }
+                        // }
+
+                        // 转发给本地tcp socket服务器
+                        ipHeader.setSourceIP(destinationIP);
+                        ipHeader.setDestinationIP(LOCAL_IP);
+                        tcpHeader.setDestinationPort((short)(m_localTcpServer.Port & 0xFFFF));
+
+                        CommonMethods.ComputeTCPChecksum(ipHeader, tcpHeader);
+                        // System.out.printf("%s:%d\n", CommonMethods.ipIntToString(ipHeader.getDestinationIP()), tcpHeader.getDestinationPort() & 0xFFFF);
+                        m_out.write(ipHeader.m_Data, ipHeader.m_Offset, size);
+//                        System.out.printf("%s\n", new String(ipHeader.m_Data));
+                        // System.out.printf("write %d size data from %s:%d to %s:%d.\n", size, CommonMethods.ipIntToString(sourceIP), sourcePort & 0xFFFF, CommonMethods.ipIntToString(destinationIP), destinationPort & 0xFFFF);
+                        session.BytesSent += tcpDataSize;
+                    }
+                }
+                // if (sourceIP != LOCAL_IP) {
+//                Socket client = new Socket(CommonMethods.ipIntToString(LOCAL_IP), m_localTcpServer.Port & 0xFFFF);
+//                client.close();
+                // }
+                // Log.i("LocalVpnService", CommonMethods.ipIntToString(sourceIP));
                 break;
             case IPHeader.UDP:
-
+                break;
+            default:
                 break;
         }
     }

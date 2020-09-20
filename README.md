@@ -71,3 +71,8 @@ emulator的目录是android sdk所在目录，在环境变量里可以查看。
 7、然后给这个链接和目的地址建立隧道。
 8、当tun读取到从LP过来的报文时，需要根据目的端口找到session，根据session里的信息把报文的源地址和源端口修改为session的目的地址和目的端口。报文的目的地址和目的端口改为session的
 源地址和源端口。
+JAVA里没有无符号类型，所以端口号一旦大了，就会输出负数。Byte和Integer类都有相应都静态方法用来把有符号数转换为无符号数。
+
+## 第七节
+
+java TCP/IP里。有一个selector,可以在一个线程里管理多个socketChannel,核心操作就是把selector绑定到多个socket上。
