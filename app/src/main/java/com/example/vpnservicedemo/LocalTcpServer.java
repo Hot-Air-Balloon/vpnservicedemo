@@ -81,14 +81,32 @@ public class LocalTcpServer implements Runnable {
         return null;
     }
 
+    private class ForwardObj {
+        public SocketChannel readChannel;
+        public SocketChannel writeChannel;
+    }
     /**
      * 接受tun转发来的链接
      */
     void onAccepted() {
         try {
             SocketChannel localChannel = m_ServerSocketChannel.accept();
-            InetSocketAddress destAddress = getDestAddress(localChannel);
+            final InetSocketAddress destAddress = getDestAddress(localChannel);
             Log.i("localTcpServer", destAddress.getAddress() + ":" + destAddress.getPort());
+            final SocketChannel targetChannel = SocketChannel.open();
+            targetChannel.configureBlocking(false);
+            LocalVpnService.Instance.protect(targetChannel.socket());
+
+            ForwardObj m_localForward = new ForwardObj();
+            m_localForward.readChannel = localChannel;
+            m_localForward.writeChannel = targetChannel;
+            ForwardObj m_targetForward = new ForwardObj();
+            m_targetForward.readChannel = targetChannel;
+            m_targetForward.writeChannel = localChannel;
+
+            localChannel.register(m_Selector, SelectionKey.OP_READ, m_localForward);
+            targetChannel.register(m_Selector, SelectionKey.OP_READ, m_targetForward);
+            targetChannel.connect(destAddress);
         } catch (Exception e) {
             e.printStackTrace();
         }

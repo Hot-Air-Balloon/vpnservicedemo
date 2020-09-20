@@ -133,17 +133,17 @@ public class LocalVpnService extends VpnService implements Runnable {
                     System.out.printf("send loop");
                 }
                 if (sourceIP == LOCAL_IP) {
-                    System.out.printf("%s:%d to %s:%d\n",
-                            CommonMethods.ipIntToString(sourceIP),
-                            sourcePort & 0xFFFF,
-                            CommonMethods.ipIntToString(destinationIP),
-                            destinationPort & 0xFFFF
-                    );
 //                     Log.i("LocalVpnService", CommonMethods.ipIntToString(sourceIP));
 //                     Log.i("LocalVpnService", Short.toString(sourcePort));
 //                     Log.i("LocalVpnService", CommonMethods.ipIntToString(destinationIP));
 //                     Log.i("LocalVpnService", Short.toString(destinationPort));
                     if (sourcePort != m_localTcpServer.Port) {
+                        System.out.printf("from %s:%d to %s:%d\n",
+                                CommonMethods.ipIntToString(sourceIP),
+                                sourcePort & 0xFFFF,
+                                CommonMethods.ipIntToString(destinationIP),
+                                destinationPort & 0xFFFF
+                        );
                         // 如果不是从本地scoket服务来的报文，就把报文发给本地socket服务
                         // 如果会话是不存在，就创建会话
                         NatSession session = NatSessionManager.getSession(sourcePort);
@@ -180,7 +180,32 @@ public class LocalVpnService extends VpnService implements Runnable {
 //                        System.out.printf("%s\n", new String(ipHeader.m_Data));
                         // System.out.printf("write %d size data from %s:%d to %s:%d.\n", size, CommonMethods.ipIntToString(sourceIP), sourcePort & 0xFFFF, CommonMethods.ipIntToString(destinationIP), destinationPort & 0xFFFF);
                         session.BytesSent += tcpDataSize;
+                    } else {
+                        System.out.printf("to %s:%d to %s:%d\n",
+                                CommonMethods.ipIntToString(sourceIP),
+                                sourcePort & 0xFFFF,
+                                CommonMethods.ipIntToString(destinationIP),
+                                destinationPort & 0xFFFF
+                        );
+                        // 如果是从socket服务器发来的IP报文
+                        NatSession session = NatSessionManager.getSession(destinationPort);
+                        if (session != null) {
+                            ipHeader.setSourceIP(destinationIP);
+                            tcpHeader.setSourcePort(session.RemotePort);
+                            ipHeader.setDestinationIP((LOCAL_IP));
+                            CommonMethods.ComputeTCPChecksum(ipHeader, tcpHeader);
+                            m_out.write(ipHeader.m_Data, ipHeader.m_Offset, size);
+                        } else {
+                            System.out.printf("NoSession: %s %s\n", ipHeader.toString(), tcpHeader.toString());
+                        }
                     }
+                } else {
+                    System.out.printf("other %s:%d to %s:%d\n",
+                            CommonMethods.ipIntToString(sourceIP),
+                            sourcePort & 0xFFFF,
+                            CommonMethods.ipIntToString(destinationIP),
+                            destinationPort & 0xFFFF
+                    );
                 }
                 // if (sourceIP != LOCAL_IP) {
 //                Socket client = new Socket(CommonMethods.ipIntToString(LOCAL_IP), m_localTcpServer.Port & 0xFFFF);
