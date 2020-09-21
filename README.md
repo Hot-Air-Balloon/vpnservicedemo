@@ -81,3 +81,5 @@ java TCP/IP里。有一个selector,可以在一个线程里管理多个socketCha
 1、可能是IP报文的CRC不对。
 2、可能tun设备设置的不对。
 可以通过上一次直接转发给iptables的报文来调试是否是CRC不对。
+
+最后不对的原因是因为我没有转发从socket端口回来的握手报文，改着改着就对了。
