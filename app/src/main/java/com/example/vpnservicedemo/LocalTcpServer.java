@@ -3,6 +3,7 @@ package com.example.vpnservicedemo;
 import android.util.Log;
 
 import java.net.InetSocketAddress;
+import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.ServerSocketChannel;
@@ -45,9 +46,9 @@ public class LocalTcpServer implements Runnable {
         try {
             while (true) {
                 // 监听selector的事件
-                System.out.printf("select run\n");
+//                System.out.printf("select run\n");
                 m_Selector.select();
-                System.out.printf("select working\n");
+//                System.out.printf("select working\n");
                 Iterator<SelectionKey> keyIterator = m_Selector.selectedKeys().iterator();
                 while (keyIterator.hasNext()) {
                     SelectionKey key = keyIterator.next();
@@ -57,15 +58,17 @@ public class LocalTcpServer implements Runnable {
                     }
                     if (key.isAcceptable()) {
                         onAccepted();
-                    }
-                    if (key.isReadable()) {
+                    } else if (key.isReadable()) {
+                        System.out.printf("isReadable\n");
+                        ((ForwardObj)key.attachment()).readAndWrite(key);
+                    } else if (key.isWritable()) {
 
-                    }
-                    if (key.isWritable()) {
-
+                    } else if (key.isConnectable()) {
+                        ((ForwardObj)key.attachment()).onConnectHandle();
                     }
                     keyIterator.remove();
                 }
+                Thread.sleep(100);
             }
         } catch (Exception e) {
             e.printStackTrace();
@@ -84,6 +87,50 @@ public class LocalTcpServer implements Runnable {
     private class ForwardObj {
         public SocketChannel readChannel;
         public SocketChannel writeChannel;
+        public Selector m_forwardSelector;
+        public ForwardObj readForwardObj;
+
+        public ByteBuffer GL_BUFFER = ByteBuffer.allocate(20000);
+
+        public void onConnectHandle() {
+            try {
+                if (this.readChannel.finishConnect()) {
+                    readForwardObj.readChannel.register(m_forwardSelector, SelectionKey.OP_READ, readForwardObj);
+                    Log.i("localTcp", "target connect");
+                } else {
+
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+
+        public void readAndWrite(SelectionKey key) {
+            try {
+                ByteBuffer buffer = GL_BUFFER;
+                int bytesRead = readChannel.read(buffer);
+                if (bytesRead > 0) {
+                    buffer.flip();
+                    writeChannel.write(buffer);
+                }
+                if (bytesRead == -1) {
+                    key.cancel();
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+                key.cancel();
+                this.dispose();
+            }
+        }
+
+        public void dispose() {
+            try {
+                readChannel.close();
+                writeChannel.close();
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
     }
     /**
      * 接受tun转发来的链接
@@ -91,6 +138,7 @@ public class LocalTcpServer implements Runnable {
     void onAccepted() {
         try {
             SocketChannel localChannel = m_ServerSocketChannel.accept();
+            localChannel.configureBlocking(false);
             final InetSocketAddress destAddress = getDestAddress(localChannel);
             Log.i("localTcpServer", destAddress.getAddress() + ":" + destAddress.getPort());
             final SocketChannel targetChannel = SocketChannel.open();
@@ -100,12 +148,15 @@ public class LocalTcpServer implements Runnable {
             ForwardObj m_localForward = new ForwardObj();
             m_localForward.readChannel = localChannel;
             m_localForward.writeChannel = targetChannel;
+
             ForwardObj m_targetForward = new ForwardObj();
             m_targetForward.readChannel = targetChannel;
             m_targetForward.writeChannel = localChannel;
+            m_targetForward.m_forwardSelector = m_Selector;
+            m_targetForward.readForwardObj = m_localForward;
 
-            localChannel.register(m_Selector, SelectionKey.OP_READ, m_localForward);
-            targetChannel.register(m_Selector, SelectionKey.OP_READ, m_targetForward);
+            // localChannel.register(m_Selector, SelectionKey.OP_READ, m_localForward);
+            targetChannel.register(m_Selector, SelectionKey.OP_READ | SelectionKey.OP_CONNECT, m_targetForward);
             targetChannel.connect(destAddress);
         } catch (Exception e) {
             e.printStackTrace();
