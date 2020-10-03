@@ -11,7 +11,7 @@ import java.nio.charset.Charset;
 import java.nio.charset.CharsetDecoder;
 
 public class UdpTest implements Runnable {
-    private final SocketAddress serverAddress = new InetSocketAddress("172.16.167.128", 9090);
+    private final SocketAddress serverAddress = new InetSocketAddress("127.0.0.1", 31024);
 
     public void runThread () {
         Thread m_udpThread = new Thread(this, "UdpTest");
