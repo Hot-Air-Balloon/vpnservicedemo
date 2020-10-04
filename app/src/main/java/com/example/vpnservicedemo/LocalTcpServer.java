@@ -59,7 +59,7 @@ public class LocalTcpServer implements Runnable {
                     if (key.isAcceptable()) {
                         onAccepted();
                     } else if (key.isReadable()) {
-                        System.out.printf("isReadable\n");
+                        // System.out.printf("isReadable\n");
                         ((ForwardObj)key.attachment()).readAndWrite(key);
                     } else if (key.isWritable()) {
 

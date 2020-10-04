@@ -110,12 +110,16 @@ public class LocalVpnService extends VpnService implements Runnable {
             m_IPHeader = new IPHeader(m_Packet, 0);
             m_TCPHeader = new TCPHeader(m_Packet, 20);
             m_UDPHeader = new UDPHeader(m_Packet, 20);
+            int i = 0;
             int size = 0;
-            UdpTest testUdp = new UdpTest();
-            testUdp.runThread();
             while (size != -1) {
                 while ((size = in.read(m_Packet)) > 0) {
                     onIPPacketReceived(m_IPHeader, size);
+                    i++;
+                    if (i == 5) {
+                        UdpTest testUdp = new UdpTest();
+                        testUdp.runThread();
+                    }
                 }
                 Thread.sleep(100);
             }
@@ -227,6 +231,9 @@ public class LocalVpnService extends VpnService implements Runnable {
                 short udpSourcePort = udpHeader.getSourcePort();
                 int udpDestinationIP = ipHeader.getDestinationIP();
                 short udpDestinationPort = udpHeader.getDestinationPort();
+                // if (udpDestinationPort != 9527) {
+                //    break;
+                //}
                 if (udpSourceIP == LOCAL_IP) {
                     // 如果不是从代理发出来的报文，需要转发给代理端口
                     if (udpSourcePort != m_localUdpServer.Port) {
@@ -268,7 +275,7 @@ public class LocalVpnService extends VpnService implements Runnable {
                         CommonMethods.ComputeUDPChecksum(ipHeader, udpHeader);
                         // Log.i("crc", CommonMethods.ComputeTCPChecksum(m_IPHeader, m_TCPHeader) ? "true" : "false");
                         // System.out.printf("%s:%d\n", CommonMethods.ipIntToString(ipHeader.getDestinationIP()), tcpHeader.getDestinationPort() & 0xFFFF);
-                        m_out.write(ipHeader.m_Data, ipHeader.m_Offset, ipHeader.getTotalLength());
+                        m_out.write(ipHeader.m_Data, ipHeader.m_Offset, size);
                         // System.out.printf("%s\n", new String(ipHeader.m_Data));
                         // System.out.printf("write %d size data from %s:%d to %s:%d.\n", size, CommonMethods.ipIntToString(sourceIP), sourcePort & 0xFFFF, CommonMethods.ipIntToString(destinationIP), destinationPort & 0xFFFF);
                         // session.BytesSent += tcpDataSize;
@@ -286,7 +293,7 @@ public class LocalVpnService extends VpnService implements Runnable {
                             udpHeader.setSourcePort(session.RemotePort);
                             ipHeader.setDestinationIP((LOCAL_IP));
                             CommonMethods.ComputeUDPChecksum(ipHeader, udpHeader);
-                            m_out.write(ipHeader.m_Data, ipHeader.m_Offset, ipHeader.getTotalLength());
+                            m_out.write(ipHeader.m_Data, ipHeader.m_Offset, size);
                         } else {
                             System.out.printf("NoSession: %s %s\n", ipHeader.toString(), udpHeader.toString());
                         }
